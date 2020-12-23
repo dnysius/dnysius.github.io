@@ -1,0 +1,142 @@
+---
+title: "Logistic LASSO Vignette"
+author: "Dionysius Indraatmadja  (1003024416)"
+date: "04/12/2020"
+output:
+  pdf_document: default
+---
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+# Preface
+In this vignette we will outline the process for fitting data to a L1-regularized logistic regression model, and using the model to predict new data, in a tidymodels workflow. The following examples require the most up-to-date versions of the `tidymodels` and `tidyverse` packages.
+
+# Creating the data
+We'll create some data to fit the logistic LASSO on, and split it into training and testing sets. Note that the columns `x` and `w` are numeric columns, `y` is a numeric factor, and `cat` is a character vector.
+
+```{r setup_and_data, include=TRUE}
+source("functions.R")
+source("make_tidy.R")
+set.seed(1)
+n= 1000
+dat <- tibble(x = seq(-3,3, length.out = n),
+              w = 3*cos(3*seq(-pi,pi, length.out = n)),
+              y = rbinom(n,size = 1, prob = 1/(1 + exp(-w+2*x)) )%>% as.numeric %>% factor,
+              cat = sample(c("a","b","c"), n, replace = TRUE)
+)
+split <- initial_split(dat, strata = c("cat"))
+train <- training(split)
+test <- testing(split)
+```
+
+Let's take a peek at the data:
+```{r data_preview, include=TRUE,echo=TRUE}
+head(train)
+```
+
+# Creating the tidymodels workflow
+We define the recipe making sure *not* to use `step_intercept()` in this algorithm since the intercept is treated differently due to the penalization. Since `cat` is nominal data, we use `step_dummy(all_nominal(), -y)` to convert the character values into placeholder numeric values; we exclude `y` because it is the dependent variable.
+
+```{r recipe, include=TRUE}
+rec <- recipe(y ~ . , data = train) %>%
+  step_dummy(all_nominal(), -y) %>% step_zv(all_outcomes()) %>%
+  step_normalize(all_numeric(), -y)
+```
+
+Since we need to specify the penalty value `lambda` to the algorithm, we will set up the tuning of lambda. "Tuning" the penalty means numerically finding the optimal penalty value (and automatically via tidymodels).
+
+```{r tune, include=TRUE}
+grid <- grid_regular(penalty(), levels = 40)
+spec_tune <- logistic_lasso(penalty = tune()) %>% set_engine("fit_logistic_lasso")
+```
+
+Now we're ready to create the workflow and tune the model. Once tuned, we can see how the mean accuracy changes with an increase in the penalty. 
+
+```{r fit_tune, include=TRUE}
+wf <- workflow() %>% add_recipe(rec) %>% add_model(spec_tune)
+folds <- vfold_cv(train)
+fit_tune <- wf %>%
+  tune_grid(resamples = folds, grid = grid, metrics = metric_set(accuracy))
+
+fit_tune %>% collect_metrics() %>% ggplot(aes(penalty, mean)) + geom_line() +
+  facet_wrap(~.metric)
+```
+
+We'll automatically select the best penalty based on the "accuracy" metric and then save the fit that corresponds to this penalty as `final_fit`.
+```{r penalty_final, include=TRUE}
+penalty_final <- fit_tune %>%
+  select_best(metric = "accuracy")
+
+wf_final <- wf %>%
+  finalize_workflow(penalty_final)
+final_fit <- wf_final %>% fit(train)
+```
+
+Using the testing data, we can see if the model predicts the classification data vector accurately.
+```{r pred, include=TRUE}
+logistic_lasso_pred<-predict(final_fit, new_data = test)
+logistic_lasso_pred %>% bind_cols(test %>% select(y)) %>% conf_mat(truth = y, estimate = .pred_class)
+```
+We found that 26 out of 249 observations were incorrectly classified, which is reasonable!
+
+# Conclusion
+Logistic regression with L1-regularization of the logistic LASSO helps to exclude predictors with a weak relationship with the dependent variable in classification problems where we have more features (most of them being not meaningful) than observations. The tidymodels workflow standardizes the data preparation and formatting which makes it easier to fit data using different models; or to fit a model to different data sets.
+
+Looking at our final fit:
+```{r access, include=TRUE}
+final_fit
+```
+We see that we can access the factor level names, coefficients, or penalty from the final fit. For example, we can find the original factor level names before they were converted to numeric values in the algorithm:
+
+```{r factor_names, include=TRUE}
+fct_names <- final_fit$fit$fit$fit$fct_levels
+```
+
+This is useful for assigning the original class names to the predicted data.
+
+```{r glm, include=FALSE, echo=FALSE}
+grid <- grid_regular(penalty(), levels = 40)
+spec_glm_tune <- logistic_reg(penalty = tune(), mixture=1) %>% set_engine("glmnet")
+wf_glm <- workflow() %>% add_recipe(rec) %>% add_model(spec_glm_tune)
+folds <- vfold_cv(train)
+fit_glm <- wf_glm %>%
+  tune_grid(resamples = folds, grid = grid, metrics = metric_set(accuracy))
+
+fit_glm %>% collect_metrics() %>% ggplot(aes(penalty, mean)) + geom_line() +
+  facet_wrap(~.metric)
+
+penalty_final_glm <- fit_glm %>%
+  select_best(metric = "accuracy")
+
+wf_final_glm <- wf_glm %>%
+  finalize_workflow(penalty_final_glm)
+final_fit_glm <- wf_final_glm %>% fit(train)
+
+# Check to see if the predictions are the same with glmnet L1-regularized logistic regression
+test_dat <- rec %>% prep(test) %>% bake(test)
+glm_pred <- predict(final_fit_glm, test)
+preds<-logistic_lasso_pred %>% bind_cols(glm_pred = glm_pred)
+any(preds[, 1] != preds[, 2])
+```
+
+```{r test, include=FALSE, echo=FALSE}
+library(tidymodels)
+library(tidyverse)
+n = 1000
+dat <- tibble(x = seq(-20,20, length.out = n),
+              w = cos(seq(-pi,pi, length.out = n)),
+              y = rbinom(n,size = 1, prob = 1/(1 + exp(-w+2*x)) )%>% as.numeric %>% factor
+)
+split <- initial_split(dat)
+train <- training(split)
+test <- testing(split)
+x<-as.matrix(train[, -3])
+y<-train$y
+ret <- fit_logistic_lasso(x, y, lambda=1e-10)
+new_x<-test[, -3]
+new_y<-predict_logistic_lasso(ret, new_x)
+
+```

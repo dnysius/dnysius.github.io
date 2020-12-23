@@ -1,0 +1,80 @@
+---
+title: "xstitch (Cross-stitch) Vignette"
+author: "Dionysius Indraatmadja"
+date: "11/3/2020"
+output:
+  pdf_document: default
+---
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+# Preface
+Ensure that this vignette R-markdown file, the R file `functions.R`, and the example image `warhol.png` are contained in the same folder. We set the working directory to this folder manually:
+```{r setup, include=TRUE}
+setwd(getwd())
+source("functions.R")
+```
+# Usage
+Let's take a look at the image we will be using. The image is comprised of relatively few colours which are generally easily distinguishable and separable from one another. We also use an image that is not too high of a resolution to allow the program to run within a reasonable time.
+
+```{r image, include=TRUE}
+image_file_name <- "warhol.png"
+im<-imager::load.image(image_file_name)
+plot(im, yaxt='n', axes=FALSE, ann=FALSE, main="original image")
+```
+
+We then perform k-means clustering on the image for the different levels specified in the list `k_list`. This process maps the original image RGB colours to a small set of DMC Floss colors. It outputs a list of useful summaries to use with the other functions. For this example, we'll compare clusterings with 6 to 12 centers.
+
+```{r get_cluster_info, include=TRUE}
+k_list <- c(6:12)
+cluster_info <- process_image(image_file_name, k_list)
+```
+
+We can plot the colours used in all of the clusterings (or levels of k):
+```{r strips, include=TRUE}
+cluster_info %>% colour_strips
+```
+
+We can take a look at the scree plot to find the "elbow" of the graph, where the change in the total within sum of squares does not change significantly between values of $k$:
+```{r scree, include=TRUE}
+cluster_info %>% scree_plot
+```
+
+We see that the y-values decrease sharply at first but slow down after about `k=9` and again at `k=11`. After this point the values decrease at relatively similar rates. This `k` value where the y-values level off is one in which an increase in `k` yields not much new information compared to `k`. Our task now is to evaluate if the resulting pattern given by these cluster levels actually depict the design to our liking.
+
+We are now ready to print the pattern. We must specify the number of clusters `k` and the approximate total number of stitches in the horizontal direction `x_size`. We also have optional arguments `black_white` and `background_colour`.
+
+We first show the simplest usage: only `k` and `x_size` are specified. Note that the value of `k` is only valid for the values of `k_list`, with the smallest value permitted being 1.
+
+```{r pattern1, include=TRUE}
+cluster_info %>% make_pattern(k=9, x_size=20)
+```
+
+We see that `x_size=20` results in a pattern that does not show the design well. So, we just increase the value of `x_size`. We now compare the patterns for the different number of clusters:
+
+```{r pattern2, include=TRUE}
+cluster_info %>% make_pattern(k=9, x_size=35)
+cluster_info %>% make_pattern(k=11, x_size=35)
+```
+
+We find that `k=9` depicts the areas on the face around the nose and forehead well as well as the eyebrows on the face. The face in `k=11` appears to be too dark of a blue compared to the original image. Hence, we will choose `k=9` for the final cross-stitch pattern. Here it is again:
+
+```{r final, include=TRUE}
+cluster_info %>% make_pattern(k=9, x_size=35)
+```
+
+# Optional features
+
+We could stop here, but there are a couple of optional features available to us. In this example, we see that "Beaver Gray - Medium (647)" is a cluster corresponding to one of the background colours of the photo; it's not the face. We can exclude the background colour (as a DMC color) from the final pattern by specifying `background_colour="647"` to the function to omit all points with the DMC colour id "647".
+
+Lastly, let's say we want to print the pattern and the brighter colors of the image would not show up well on the paper. By passing the argument `black_white=TRUE`, we can print the pattern in black and white instead of colour:
+
+```{r pattern3, include=TRUE}
+cluster_info %>% make_pattern(k=9, x_size=35, black_white=TRUE, background_colour = "647")
+```
+
+# Conclusion
+Starting with the filename of an image file in the same directory as `functions.R` and a list of numbers `k_list`, use `process_image()` to get its output `clustering_info`. Then pass it on to the functions `scree_plot()`, `colour_strips()` and `make_pattern()` to evaluate which clustering level works best for the image.
