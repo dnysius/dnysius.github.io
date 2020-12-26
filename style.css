@@ -1,3 +1,13 @@
+@font-face{
+	font-family: "Sansation";
+	src:url("fonts/Sansation_Regular.ttf")
+}
+
+@font-face{
+	font-family: "Vollkorn SC";
+	src:url("fonts/VollkornSC-Regular.ttf")
+}
+
 .paragraph {
 	font-size: 1.15vw;
 	line-height: 1.5vw;
@@ -71,6 +81,7 @@ nav a{
 	text-decoration: none;
 	display: inline-block;
 	font-size:100%;
+	font-family: Sansation;
 }
 .container p{
 	line-height: 200px; /* Create scrollbar to test positioning */
