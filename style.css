@@ -8,6 +8,12 @@
 	src:url("fonts/VollkornSC-Regular.ttf")
 }
 
+.content {
+  margin:auto;
+  max-width: 50vw;
+  padding-top: 2vw;
+}
+
 .paragraph {
 	font-size: 1.15vw;
 	line-height: 1.5vw;
@@ -16,10 +22,10 @@
 }
 
 .header {
-	font-size: 2.5vw;
+	font-size: 1.5vw;
 	line-height:1.5vw;
 	font-family: Sansation;
-	color: #4d4d4d;
+	color: #1a1a1a;
 	
 }
 
@@ -27,7 +33,7 @@
 	font-size:3vw;
 	line-height: 1.5vw;
 	font-family: Sansation;
-	color: #4d4d4d;
+	color: #1a1a1a;
 }
 
 body{        
@@ -41,7 +47,6 @@ body{
 .fixed-header, .fixed-footer{
 	width: 100%;
 	height: 2%;
-	left: 0px;
 	top: 0px;
 	position: fixed;        
 	padding: 1% 1%;
@@ -50,29 +55,13 @@ body{
 	align-items: center;
 	justify-content: center;
 	display:flex;
+	margin:auto;
 }
 .fixed-header{
 	top: 0;
 }
 .fixed-footer{
 	bottom: 0;
-}
-.logo{
-	position: absolute;
-	width: 259px;
-	height: 27px;
-	left: 10px;
-	top: 10px;
-
-	font-family: Vollkorn SC;
-	font-style: normal;
-	font-weight: normal;
-	font-size: 20px;
-	line-height: 28px;
-	display: flex;
-	align-items: flex-end;
-	text-decoration: none;
-	color: #626262;
 }
 
 /* Some more styles to beutify this example */
